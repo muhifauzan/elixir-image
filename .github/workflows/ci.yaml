@@ -1,0 +1,35 @@
+name: CI
+
+on:
+- push
+
+env:
+  DOCKERHUB_USERNAME: muhifauzan
+
+jobs:
+  bulid:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        elixir:
+        - 'VERSION=1.12 VARIANT=slim-build'
+        - 'VERSION=1.12 VARIANT=slim-release'
+    steps:
+    - name: Pull Commit
+      uses: actions/checkout@v2
+
+    - name: Log in DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ env.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+
+    - name: Build and Push Image
+      run: |
+        ${{ matrix.elixir }}
+        DIR=.${VERSION:+/$VERSION}
+        DOCKERFILE=${DIR}/${VARIANT:+$VARIANT.}Dockerfile
+        eval $(awk '/elixir:/ { sub(/elixir:/, "", $2); sub(/-.*/, "", $2); printf "VERSION=%s", $2; exit }' $DOCKERFILE)
+        IMAGE=${{ env.DOCKERHUB_USERNAME }}/elixir:${VERSION}${VARIANT:+-$VARIANT}
+        docker build --pull -f $DOCKERFILE -t $IMAGE $DIR
+        docker push $IMAGE
